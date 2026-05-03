@@ -32,19 +32,30 @@
 }
 
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html,body{
+html{
   width:100%;
-  min-height:100%;
-  overflow:hidden;
+  background:var(--negro);
+  scroll-behavior:smooth;
+}
+body{
+  width:100%;
+  min-height:100vh;
   background:var(--negro);
   font-family:'Inter',sans-serif;
   color:var(--blanco);
   user-select:none;
   -webkit-user-select:none;
   -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  overflow-y:hidden;
 }
 
-body.scrollable{overflow-y:auto;overflow-x:hidden;}
+/* Cuando body es scrollable (en pantalla main) habilita scroll vertical */
+body.scrollable{
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
 
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -147,11 +158,22 @@ body.scrollable{overflow-y:auto;overflow-x:hidden;}
   z-index:10;
 }
 .screen.active{opacity:1;pointer-events:auto;}
+
+/* La pantalla scrollable es DIFERENTE: no es fixed cuando está activa,
+   es relative para permitir scroll natural del body */
 .screen.scrollable-screen{
+  display:none;
+}
+.screen.scrollable-screen.active{
   position:relative;
+  display:flex;
   height:auto;
   min-height:100vh;
   overflow:visible;
+  inset:auto;
+  opacity:1;
+  pointer-events:auto;
+  z-index:10;
 }
 
 /* ============================================================
@@ -1694,9 +1716,13 @@ function showScreen(id){
   target.classList.add('active');
   if(id === 'main'){
     document.body.classList.add('scrollable');
-    window.scrollTo(0,0);
+    // Pequeño delay para que el body acomode el layout antes de scrollear
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+    });
   } else {
     document.body.classList.remove('scrollable');
+    window.scrollTo(0, 0);
   }
 }
 
