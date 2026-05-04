@@ -1220,6 +1220,88 @@ body.scrollable{
 }
 
 /* ============================================================
+   OPTIMIZACIONES DE PERFORMANCE
+   - Aceleración GPU para elementos animados (transform: translateZ(0))
+   - El navegador los compone en una capa separada y usa la GPU.
+   ============================================================ */
+.confetti, .firework, .spark,
+.tunnel-ring, .tunnel-text,
+.cover-cta, .messi-trophy-img, .hero-img,
+.bouncing-ball, .trophy-svg-wrap,
+.bg-image, .ray{
+  will-change:transform, opacity;
+  transform:translateZ(0);
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+}
+
+/* ============================================================
+   MODO PERFORMANCE BAJA (Android viejos, dispositivos lentos)
+   Desactiva los efectos más caros: blur, box-shadow grandes,
+   backdrop-filter, animaciones de fondo costosas.
+   ============================================================ */
+body.perf-low .bg-image{
+  animation:none !important;
+  filter:saturate(1.2) !important;
+}
+body.perf-low .sun-rays{display:none;}
+body.perf-low .hero-glow-back,
+body.perf-low .hero-lightning{display:none;}
+body.perf-low .invitation-card{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  background:linear-gradient(145deg, rgba(15,42,77,.92) 0%, rgba(8,26,51,.95) 100%) !important;
+}
+body.perf-low .info-item{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+body.perf-low .cover-cta{
+  animation:fadeInUp 1s 1.4s forwards !important;
+}
+body.perf-low .cover-cta::before{display:none;}
+body.perf-low .cover-title{
+  filter:none !important;
+  text-shadow:0 2px 10px rgba(0,0,0,.8);
+}
+body.perf-low .messi-trophy-wrapper::before{display:none;}
+body.perf-low .messi-trophy-img{
+  animation:none !important;
+  filter:drop-shadow(0 10px 20px rgba(0,0,0,.5));
+}
+body.perf-low .hero-img{
+  animation:none !important;
+  filter:drop-shadow(0 10px 20px rgba(0,0,0,.5));
+}
+body.perf-low .trophy-sparkle{display:none;}
+body.perf-low .countdown-box::before{display:none;}
+body.perf-low .invitation-card::before{display:none;}
+body.perf-low .bouncing-ball{display:none;}
+body.perf-low .sound-toggle{display:none;}
+body.perf-low .bg-overlay{
+  background:linear-gradient(180deg, rgba(4,13,28,.7) 0%, rgba(15,42,77,.8) 100%) !important;
+}
+/* En perf-low simplificamos el confeti sin shadow ni sway complejo */
+body.perf-low .confetti{
+  box-shadow:none !important;
+  animation-name:confettiFall !important;
+}
+body.perf-low .modal-overlay{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  background:rgba(0,0,0,.92) !important;
+}
+body.perf-low .modal-content{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+
+/* MODO MEDIUM - intermedio */
+body.perf-medium .sun-rays{opacity:.15;}
+body.perf-medium .hero-lightning{opacity:.2;}
+body.perf-medium .messi-trophy-wrapper::before{filter:blur(20px);}
+
+/* ============================================================
    INFO ITEM CLICKEABLE (botón)
    ============================================================ */
 button.info-item{
@@ -1985,6 +2067,55 @@ button.info-item{
 
 <script>
 // =====================================================
+// DETECCIÓN DE PERFORMANCE - Para celulares más viejos
+// =====================================================
+const PERF = (() => {
+  // Hardware concurrency: cores del CPU. Celulares viejos = 4 o menos.
+  const cores = navigator.hardwareConcurrency || 4;
+  // deviceMemory en GB. No siempre disponible. Si está, < 4GB = lento.
+  const memory = navigator.deviceMemory || 4;
+  // User agent: detectar Android viejo o iPhone viejo
+  const ua = navigator.userAgent.toLowerCase();
+  const isAndroid = /android/.test(ua);
+  const isOldAndroid = isAndroid && /android [4-9]\./.test(ua);
+  // Pantalla pequeña suele ser celular más modesto
+  const smallScreen = window.innerWidth < 400;
+  // Reducción manual por preferencia de movimiento
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Score: menor = más lento
+  let score = cores + memory;
+  if(isOldAndroid) score -= 4;
+  if(smallScreen) score -= 1;
+
+  // 3 niveles: high, medium, low
+  let level;
+  if(reducedMotion) level = 'low';
+  else if(score >= 10) level = 'high';
+  else if(score >= 6) level = 'medium';
+  else level = 'low';
+
+  return {
+    level,
+    isLow: level === 'low',
+    isMedium: level === 'medium',
+    isHigh: level === 'high',
+    cores, memory, isAndroid, smallScreen,
+    // Ajustes derivados
+    sparkleCount: level === 'high' ? 200 : (level === 'medium' ? 100 : 50),
+    confettiBurst: level === 'high' ? 80 : (level === 'medium' ? 40 : 20),
+    confettiPersistent: level === 'high' ? 30 : (level === 'medium' ? 15 : 8),
+    tunnelRings: level === 'high' ? 8 : (level === 'medium' ? 5 : 3),
+    fireworkParticles: level === 'high' ? 28 : (level === 'medium' ? 18 : 12),
+    fireworkInterval: level === 'high' ? 700 : (level === 'medium' ? 1100 : 1600),
+  };
+})();
+
+// Aplicar clase al body para CSS condicional
+document.body.classList.add('perf-' + PERF.level);
+console.log('Performance level:', PERF.level, '| Score factors:', { cores: PERF.cores, memory: PERF.memory });
+
+// =====================================================
 // CONFIGURACIÓN PERSONALIZABLE (editar acá)
 // =====================================================
 const CONFIG = {
@@ -2215,13 +2346,17 @@ for(let i=0; i<24; i++){
 // CANVAS DE DESTELLOS - PARTÍCULAS REALES tipo bandera argentina
 // =====================================================
 const canvas = document.getElementById('sparklesCanvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
 let particles = [];
 let canvasW, canvasH;
 
 function resizeCanvas(){
-  canvasW = canvas.width = window.innerWidth;
-  canvasH = canvas.height = window.innerHeight;
+  // En dispositivos lentos usamos resolución reducida y CSS la escala (más rápido)
+  const scale = PERF.isLow ? 0.6 : (PERF.isMedium ? 0.8 : 1);
+  canvasW = canvas.width = Math.floor(window.innerWidth * scale);
+  canvasH = canvas.height = Math.floor(window.innerHeight * scale);
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
@@ -2319,44 +2454,55 @@ class Sparkle {
   }
   draw(){
     if(this.opacity <= 0) return;
-    ctx.save();
     ctx.globalAlpha = this.opacity;
     ctx.fillStyle = this.color;
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = this.size * 4;
+    // shadowBlur es caro - solo en performance high
+    if(PERF.isHigh){
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = this.size * 4;
+    }
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
     ctx.fill();
     
-    // Pequeñas estrellas brillantes esporádicamente
-    if(this.size > 1.2 && this.opacity > 0.7){
-      ctx.shadowBlur = this.size * 6;
+    // Pequeñas estrellas brillantes - solo en performance alta o media
+    if(!PERF.isLow && this.size > 1.2 && this.opacity > 0.7){
+      if(PERF.isHigh) ctx.shadowBlur = this.size * 6;
       ctx.fillStyle = '#FFFFFF';
       ctx.globalAlpha = this.opacity * 0.6;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.restore();
+    // Reset shadow para próxima partícula (más rápido que save/restore)
+    if(PERF.isHigh) ctx.shadowBlur = 0;
   }
 }
 
-// Crear partículas - cantidad ajustada al tamaño de pantalla
-const particleCount = window.innerWidth < 500 ? 120 : 200;
+// Crear partículas - cantidad ajustada según performance del dispositivo
+const particleCount = PERF.sparkleCount;
 for(let i=0; i<particleCount; i++){
   particles.push(new Sparkle());
 }
 
 let animFrame;
-function animateSparkles(){
-  ctx.clearRect(0, 0, canvasW, canvasH);
-  particles.forEach(p => {
-    p.update();
-    p.draw();
-  });
+let lastFrameTime = 0;
+// Target FPS: 60 en high, 30 en medium/low (suficientemente fluido)
+const targetFrameInterval = PERF.isHigh ? 0 : (PERF.isMedium ? 33 : 50);
+
+function animateSparkles(now){
   animFrame = requestAnimationFrame(animateSparkles);
+  // Throttle: skip frames si vamos muy rápido para el target
+  if(now - lastFrameTime < targetFrameInterval) return;
+  lastFrameTime = now;
+
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  for(let i=0; i<particles.length; i++){
+    particles[i].update();
+    particles[i].draw();
+  }
 }
-animateSparkles();
+animateSparkles(0);
 
 // =====================================================
 // CONFETI ANIMADO
@@ -2365,6 +2511,7 @@ function createConfetti(container, count, persistent=false){
   const layer = document.getElementById(container);
   if(!layer) return;
   const colors = ['#75AADB','#FFFFFF','#FFD93D','#9DC9E8','#FFE57A','#4DD0E8'];
+  const useShadow = !PERF.isLow;
   for(let i=0; i<count; i++){
     const c = document.createElement('div');
     c.className = 'confetti';
@@ -2383,7 +2530,7 @@ function createConfetti(container, count, persistent=false){
       animation: confettiFall ${dur}s ${delay}s ${persistent?'infinite':'forwards'} linear,
                  confettiSway ${swayDur}s ${delay}s infinite ease-in-out;
       ${Math.random()>.5 ? 'border-radius:50%;' : ''}
-      box-shadow: 0 0 6px ${color};
+      ${useShadow ? `box-shadow: 0 0 6px ${color};` : ''}
     `;
     layer.appendChild(c);
     if(!persistent){
@@ -2445,17 +2592,29 @@ function playTunnelTransition(){
   const text = document.getElementById('tunnelText');
   rings.innerHTML = '';
 
+  // Pausar el canvas de partículas durante la transición para no saturar GPU
+  if(animFrame){
+    cancelAnimationFrame(animFrame);
+    animFrame = null;
+  }
+
   showScreen('tunnel');
 
   if(soundEnabled) playRoarSound();
 
   const colors = ['#FFD93D','#75AADB','#FFFFFF','#FFE57A','#4DD0E8','#9DC9E8'];
-  for(let i=0; i<8; i++){
+  const ringCount = PERF.tunnelRings;
+  // En dispositivos lentos quitamos el box-shadow (es lo más caro)
+  const useShadow = !PERF.isLow;
+
+  for(let i=0; i<ringCount; i++){
     const ring = document.createElement('div');
     ring.className = 'tunnel-ring';
     ring.style.borderColor = colors[i % colors.length];
-    ring.style.boxShadow = `0 0 30px ${colors[i % colors.length]}, inset 0 0 30px ${colors[i % colors.length]}`;
-    ring.style.animation = `tunnelRingExpand 1.4s ${i*0.1}s ease-out forwards`;
+    if(useShadow){
+      ring.style.boxShadow = `0 0 30px ${colors[i % colors.length]}, inset 0 0 30px ${colors[i % colors.length]}`;
+    }
+    ring.style.animation = `tunnelRingExpand 1.4s ${i*0.12}s ease-out forwards`;
     rings.appendChild(ring);
   }
 
@@ -2464,14 +2623,14 @@ function playTunnelTransition(){
     style.id = 'tunnelKeyframes';
     style.textContent = `
       @keyframes tunnelRingExpand{
-        0%{transform:scale(.05);opacity:0;border-width:8px;}
+        0%{transform:scale(.05) translateZ(0);opacity:0;border-width:8px;}
         30%{opacity:1;}
-        100%{transform:scale(8);opacity:0;border-width:1px;}
+        100%{transform:scale(8) translateZ(0);opacity:0;border-width:1px;}
       }
       @keyframes tunnelTextZoom{
-        0%{transform:scale(.3);opacity:0;letter-spacing:-.5em;}
+        0%{transform:scale(.3) translateZ(0);opacity:0;letter-spacing:-.5em;}
         40%{opacity:1;}
-        100%{transform:scale(2);opacity:0;letter-spacing:.5em;}
+        100%{transform:scale(2) translateZ(0);opacity:0;letter-spacing:.5em;}
       }
     `;
     document.head.appendChild(style);
@@ -2485,6 +2644,10 @@ function playTunnelTransition(){
   setTimeout(() => {
     showScreen('main');
     burstConfettiOnMain();
+    // Reanudar canvas de partículas después del confeti
+    setTimeout(() => {
+      if(!animFrame) animateSparkles();
+    }, PERF.isLow ? 1500 : 500);
   }, 1900);
 }
 
@@ -2493,7 +2656,10 @@ function burstConfettiOnMain(){
   const layer = document.getElementById('globalConfetti');
   if(!layer) return;
   const colors = ['#75AADB','#FFFFFF','#FFD93D','#9DC9E8','#FFE57A','#4DD0E8'];
-  for(let i=0; i<80; i++){
+  const burstCount = PERF.confettiBurst;
+  const useShadow = !PERF.isLow;
+
+  for(let i=0; i<burstCount; i++){
     const c = document.createElement('div');
     c.className = 'confetti';
     const left = Math.random()*100;
@@ -2509,16 +2675,19 @@ function burstConfettiOnMain(){
       animation: confettiFall ${dur}s ${Math.random()*1}s forwards linear,
                  confettiSway ${1.5+Math.random()*2}s infinite ease-in-out;
       ${Math.random()>.5 ? 'border-radius:50%;' : ''}
-      box-shadow: 0 0 6px ${color};
+      ${useShadow ? `box-shadow: 0 0 6px ${color};` : ''}
     `;
     layer.appendChild(c);
     setTimeout(()=>c.remove(), (dur+2)*1000);
   }
   
-  // Continuar con confeti suave
-  createConfetti('globalConfetti', 25, false);
-  setTimeout(() => createConfetti('globalConfetti', 25, false), 3000);
-  setTimeout(() => createConfetti('globalConfetti', 25, false), 6000);
+  // Continuar con confeti suave (menos cantidad en lentos)
+  const persistent = PERF.confettiPersistent;
+  createConfetti('globalConfetti', persistent, false);
+  if(!PERF.isLow){
+    setTimeout(() => createConfetti('globalConfetti', persistent, false), 3000);
+    setTimeout(() => createConfetti('globalConfetti', persistent, false), 6000);
+  }
 }
 
 // =====================================================
@@ -2527,7 +2696,8 @@ function burstConfettiOnMain(){
 function launchFirework(layer, x, y){
   const colors = ['#FFD93D','#75AADB','#FFFFFF','#FFE57A','#4DD0E8','#9DC9E8','#FF6B6B'];
   const color = colors[Math.floor(Math.random()*colors.length)];
-  const particleCount = 28;
+  const particleCount = PERF.fireworkParticles;
+  const useShadow = !PERF.isLow;
 
   for(let i=0; i<particleCount; i++){
     const angle = (Math.PI*2 * i) / particleCount;
@@ -2540,7 +2710,9 @@ function launchFirework(layer, x, y){
     p.style.left = x + 'px';
     p.style.top = y + 'px';
     p.style.background = color;
-    p.style.boxShadow = `0 0 8px ${color}, 0 0 16px ${color}`;
+    if(useShadow){
+      p.style.boxShadow = `0 0 8px ${color}, 0 0 16px ${color}`;
+    }
     p.style.setProperty('--dx', dx + 'px');
     p.style.setProperty('--dy', dy + 'px');
     p.style.animation = 'fireworkExplode 1.3s ease-out forwards';
@@ -2560,15 +2732,17 @@ function startFireworks(){
     const x = 50 + Math.random()*(w-100);
     const y = 50 + Math.random()*(h*0.5);
     launchFirework(layer, x, y);
-    setTimeout(fire, 600 + Math.random()*900);
+    setTimeout(fire, PERF.fireworkInterval + Math.random()*600);
   };
   fire();
-  setTimeout(()=>launchFirework(layer, w*0.3, h*0.3), 200);
-  setTimeout(()=>launchFirework(layer, w*0.7, h*0.4), 500);
-  setTimeout(()=>launchFirework(layer, w*0.5, h*0.25), 800);
+  if(!PERF.isLow){
+    setTimeout(()=>launchFirework(layer, w*0.3, h*0.3), 200);
+    setTimeout(()=>launchFirework(layer, w*0.7, h*0.4), 500);
+    setTimeout(()=>launchFirework(layer, w*0.5, h*0.25), 800);
+  }
   
-  // Lluvia de confeti dorado
-  createConfetti('finalConfetti', 40, false);
+  // Lluvia de confeti dorado (menos en lentos)
+  createConfetti('finalConfetti', PERF.isLow ? 15 : (PERF.isMedium ? 25 : 40), false);
 }
 
 // =====================================================
