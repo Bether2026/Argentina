@@ -159,8 +159,7 @@ body.scrollable{
 }
 .screen.active{opacity:1;pointer-events:auto;}
 
-/* La pantalla scrollable es DIFERENTE: no es fixed cuando está activa,
-   es relative para permitir scroll natural del body */
+/* Pantalla scrollable (cover, main, final) - scrollea como página normal del body */
 .screen.scrollable-screen{
   display:none;
 }
@@ -179,15 +178,6 @@ body.scrollable{
 /* ============================================================
    COVER SCREEN
    ============================================================ */
-/* COVER y FINAL son fixed pero permiten scroll interno si hay overflow */
-#cover, #final{
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-}
-#cover.active, #final.active{
-  overflow-y:auto;
-}
-
 .cover-content{
   position:relative;
   z-index:10;
@@ -197,9 +187,9 @@ body.scrollable{
   justify-content:space-between;
   min-height:100vh;
   width:100%;
-  padding:30px 20px 30px;
+  padding:30px 20px 40px;
   text-align:center;
-  gap:14px;
+  gap:18px;
 }
 
 .cover-top{
@@ -1546,7 +1536,7 @@ button.info-item{
 }
 </style>
 </head>
-<body>
+<body class="scrollable">
 
 <!-- ============================================================
      FONDO GLOBAL CON DESTELLOS DE BANDERA ARGENTINA
@@ -1573,7 +1563,7 @@ button.info-item{
 <!-- ============================================================
      COVER SCREEN
      ============================================================ -->
-<section class="screen active" id="cover">
+<section class="screen scrollable-screen active" id="cover">
 
   <div class="cover-content">
 
@@ -1790,7 +1780,7 @@ button.info-item{
 <!-- ============================================================
      FINAL SCREEN
      ============================================================ -->
-<section class="screen" id="final">
+<section class="screen scrollable-screen" id="final">
   <div class="confetti-layer" id="finalConfetti"></div>
 
   <div class="final-content">
@@ -2404,9 +2394,12 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(id);
   target.classList.add('active');
-  if(id === 'main'){
+  
+  // Pantallas con scroll natural del body: cover, main, final.
+  // Pantalla sin scroll (animación full-screen): tunnel.
+  const scrollableScreens = ['cover', 'main', 'final'];
+  if(scrollableScreens.includes(id)){
     document.body.classList.add('scrollable');
-    // Pequeño delay para que el body acomode el layout antes de scrollear
     requestAnimationFrame(() => {
       window.scrollTo(0, 0);
     });
